@@ -1,0 +1,134 @@
+// NOMOO MVP schema: users, community (posts/comments), courses/lessons
+// with avatar-tutor video, and live sessions (Google Meet).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enum support, so enum-like fields below are plain
+// Strings constrained at the application layer (zod schemas / TS unions):
+// Role: "MEMBER" | "INSTRUCTOR" | "ADMIN"
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  passwordHash  String
+  role          String    @default("MEMBER")
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+
+  posts         CommunityPost[]
+  comments      CommunityComment[]
+  hostedSessions LiveSession[]      @relation("SessionHost")
+  registrations LiveSessionRegistration[]
+  avatarProfiles AvatarProfile[]
+}
+
+// --- Community ---
+
+model CommunityPost {
+  id        String   @id @default(cuid())
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  comments  CommunityComment[]
+}
+
+model CommunityComment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+}
+
+// --- Courses / Lessons / Avatar tutor ---
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+
+  lessons      Lesson[]
+  liveSessions LiveSession[]
+}
+
+// AvatarStatus: "NONE" | "PENDING" | "READY" | "FAILED"
+
+model Lesson {
+  id               String       @id @default(cuid())
+  courseId         String
+  course           Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title            String
+  script           String       // lesson content / narration script for the avatar tutor
+  order            Int          @default(0)
+  avatarProfileId  String?
+  avatarProfile    AvatarProfile? @relation(fields: [avatarProfileId], references: [id])
+  avatarStatus     String       @default("NONE")
+  avatarVideoUrl   String?
+  avatarProviderId String?      // e.g. D-ID talk id, for polling status
+  avatarError      String?
+  createdAt        DateTime     @default(now())
+}
+
+// A reusable tutor persona: a face (presenter image) + a voice, used to
+// narrate lesson scripts via text-to-speech. Instructors can create several
+// profiles (e.g. "Nomoo the mascot", "Founder voice") and assign one per lesson.
+model AvatarProfile {
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  presenterImageUrl  String   // face used for the talking-avatar video
+  voiceProvider      String   @default("microsoft") // D-ID TTS provider: microsoft | amazon | elevenlabs
+  voiceId            String   // provider-specific voice id, e.g. "en-US-JennyNeural"
+  language           String   @default("en-US")
+  createdById        String
+  createdBy          User     @relation(fields: [createdById], references: [id])
+  createdAt          DateTime @default(now())
+
+  lessons            Lesson[]
+}
+
+// --- Live sessions (Google Meet) ---
+
+// SessionStatus: "SCHEDULED" | "LIVE" | "ENDED" | "CANCELLED"
+
+model LiveSession {
+  id              String        @id @default(cuid())
+  courseId        String?
+  course          Course?       @relation(fields: [courseId], references: [id])
+  hostId          String
+  host            User          @relation("SessionHost", fields: [hostId], references: [id])
+  title           String
+  description     String?
+  scheduledStart  DateTime
+  scheduledEnd    DateTime
+  meetLink        String?       // populated automatically via Google Calendar, or pasted manually
+  calendarEventId String?
+  status          String        @default("SCHEDULED")
+  createdAt       DateTime      @default(now())
+
+  registrations   LiveSessionRegistration[]
+}
+
+model LiveSessionRegistration {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  createdAt DateTime    @default(now())
+
+  @@unique([sessionId, userId])
+}
