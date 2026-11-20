@@ -1,8 +1,14 @@
 # NOMOO Frontend
 
-Currently the static site design (imported from Claude Design) plus a
-Firebase client init. No bundler yet — everything runs as plain ES modules
-in the browser.
+The static site design — branded "Ladder" for now — plus a Firebase client
+init. No bundler yet — everything runs as plain HTML/CSS/vanilla JS plus one
+ES module in the browser.
+
+- `index.html` + `assets/` — the app itself (phone-frame mockup on desktop,
+  full-bleed on real mobile viewports). See `assets/README` notes inline in
+  `app.js` for how the screens are put together.
+- Typography: **Fraunces** (display) + **Plus Jakarta Sans** (body).
+- `firebase-init.js` is already wired into `index.html`'s `<head>`.
 
 ## Firebase
 
